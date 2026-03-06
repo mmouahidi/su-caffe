@@ -1,0 +1,36 @@
+﻿Γû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+node.exe : ΓÜá The "middleware" file convention is deprecated. Please use 
+"proxy" instead. Learn more: 
+https://nextjs.org/docs/messages/middleware-to-proxy
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\ASUS\AppData\Roaming\n ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ΓÜá The "middle...leware-to-pro 
+   xy:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 4.1s
+  Skipping validation of types
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/8) ...
+Error occurred prerendering page "/admin/orders". Read more: 
+https://nextjs.org/docs/messages/prerender-error
+Error: @supabase/ssr: Your project's URL and API key are required to create 
+a Supabase client!
+
+Check your Supabase project's API settings to find these values
+
+https://supabase.com/dashboard/project/_/settings/api
+    at <unknown> (https://supabase.com/dashboard/project/_/settings/api)
+    at br 
+(C:\Projects\su-caffe.com\.next\server\chunks\ssr\_185ab4e6._.js:35:30)
+    at n (C:\Projects\su-caffe.com\.next\server\chunks\ssr\[root-of-the-serve
+r]__bba01189._.js:1:3692) {
+  digest: '3086345096'
+}
+Export encountered an error on /admin/(dashboard)/orders/page: 
+/admin/orders, exiting the build.
+Γ¿» Next.js build worker exited with code: 1 and signal: null

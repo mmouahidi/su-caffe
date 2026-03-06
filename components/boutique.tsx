@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useCart } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
+import { nhost } from "@/lib/nhost"
+import { useLocalData } from "@/lib/app-config"
 import { ShoppingBag, MapPin, Flame, Coffee } from "lucide-react"
 
 interface Product {
@@ -31,6 +33,8 @@ interface Product {
   flavor_notes_ar?: string
   flavor_notes_en?: string
   is_active: boolean
+  category?: string
+  is_highlighted?: boolean
 }
 
 // Brewing method icons
@@ -102,6 +106,22 @@ export function Boutique() {
     }
     return product[field] as string
   }
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const { data, error } = await nhost.graphql.request(`
+        query {
+          products(where: {is_active: {_eq: true}}, order_by: {created_at: asc}) {
+            id name name_ar name_en description description_ar description_en short_description short_description_ar short_description_en price weight image_url color_class origin origin_ar origin_en roast_level roast_level_ar roast_level_en flavor_notes flavor_notes_ar flavor_notes_en is_active category is_highlighted
+          }
+        }
+      `)
+      if (!error && data?.products) {
+        setProducts(data.products)
+      }
+    }
+    fetchProducts()
+  }, [])
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -195,8 +215,8 @@ export function Boutique() {
         {/* Products Grid */}
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
           {products
-            .filter((p: any) => activeFilter === "all" || p.category === activeFilter)
-            .map((product: any, index) => (
+            .filter((product) => activeFilter === "all" || product.category === activeFilter)
+            .map((product, index) => (
               <div
                 key={product.id}
                 className={`group relative transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"

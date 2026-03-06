@@ -5,6 +5,8 @@ import { useCart } from "@/lib/cart-context"
 import { useLanguage } from "@/lib/language-context"
 import { X, Minus, Plus, Trash2, MessageCircle } from "lucide-react"
 import Image from "next/image"
+import { nhost } from "@/lib/nhost"
+import { useLocalData } from "@/lib/app-config"
 
 export function CartDrawer() {
   const { items, isCartOpen, setIsCartOpen, updateQuantity, removeItem, total, clearCart } = useCart()
@@ -29,8 +31,38 @@ export function CartDrawer() {
     setIsSubmitting(true)
 
     try {
-      // Create a local order ID
-      const orderId = Math.random().toString(36).substring(2, 10)
+      let orderId = Math.random().toString(36).substring(2, 10)
+
+      if (!useLocalData) {
+        const orderData = {
+          customer_name: orderForm.name,
+          customer_phone: orderForm.phone,
+          customer_address: orderForm.address,
+          customer_city: orderForm.city,
+          total_amount: total,
+          notes: orderForm.notes || null,
+          status: "pending",
+          order_items: {
+            data: items.map((item) => ({
+              product_id: item.id,
+              quantity: item.quantity,
+              unit_price: item.price,
+              product_name: item.name
+            }))
+          }
+        }
+
+        const { data, error } = await nhost.graphql.request(`
+          mutation InsertOrderWithItems($object: orders_insert_input!) {
+            insert_orders_one(object: $object) {
+              id
+            }
+          }
+        `, { object: orderData })
+
+        if (error) throw error
+        orderId = data?.insert_orders_one?.id?.slice(0, 8) || orderId
+      }
 
       // Generate WhatsApp message based on language
       const whatsappMessage = encodeURIComponent(
@@ -54,7 +86,7 @@ export function CartDrawer() {
 
       setOrderSuccess(true)
       clearCart()
-      
+
       setTimeout(() => {
         setOrderSuccess(false)
         setShowCheckout(false)
@@ -75,7 +107,7 @@ export function CartDrawer() {
   return (
     <div className="fixed inset-0 z-50" dir={dir}>
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={() => setIsCartOpen(false)}
       />
@@ -114,7 +146,7 @@ export function CartDrawer() {
           <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-4">
               <p className="text-gold text-sm mb-4">{t.checkout.subtitle}</p>
-              
+
               <div>
                 <label className="block text-neutral-300 text-sm font-sans mb-2">
                   {t.checkout.name} *
@@ -290,7 +322,7 @@ export function CartDrawer() {
                 <span className="text-white font-serif text-lg" dir="ltr">{total.toFixed(2)} MAD</span>
               </div>
             )}
-            
+
             {showCheckout ? (
               <div className="flex gap-3">
                 <button

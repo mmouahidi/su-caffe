@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 import { Plus, Pencil, Trash2, X, Save } from "lucide-react"
+import { nhost } from "@/lib/nhost"
 
 interface Product {
   id: string
@@ -50,35 +50,111 @@ export function ProductsManager({ products: initialProducts }: ProductsManagerPr
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [newProduct, setNewProduct] = useState<Omit<Product, "id">>(emptyProduct)
-  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      const { data, error } = await nhost.graphql.request(`
+        query {
+          products(order_by: { created_at: desc }) {
+            id name description short_description price weight sku image_url color_class origin roast_level flavor_notes is_active is_highlighted category stock_quantity
+          }
+        }
+      `)
+      if (!error && data?.products) {
+        setProducts(data.products)
+      }
+      setIsLoading(false)
+    }
+    loadProducts()
+  }, [])
 
   const handleCreate = async () => {
-    const data: Product = {
+    // Need to cast Postgres Array format for GraphQL array inputs: String[] requires string[] not comma-sep string. Wait, flavor_notes in sql is TEXT[] but in Product it's string (due to how local-data typed it originally?).
+    // In SQL: flavor_notes is TEXT[]. In React: flavor_notes is string input.
+    // Let's coerce flavor_notes into an array format if we can, or just send a single-item array.
+    const productData = {
       ...newProduct,
-      id: Math.random().toString(36).substring(2, 15),
+      flavor_notes: typeof newProduct.flavor_notes === 'string' && newProduct.flavor_notes.trim() !== ''
+        ? `{${newProduct.flavor_notes}}`
+        : '{}'
     }
-    setProducts([data, ...products])
-    setIsCreating(false)
-    setNewProduct(emptyProduct)
+
+    const { data, error } = await nhost.graphql.request(`
+      mutation InsertProduct($object: products_insert_input!) {
+        insert_products_one(object: $object) {
+            id name description short_description price weight sku image_url color_class origin roast_level flavor_notes is_active is_highlighted category stock_quantity
+        }
+      }
+    `, { object: productData })
+
+    if (!error && data?.insert_products_one) {
+      setProducts([data.insert_products_one, ...products])
+      setIsCreating(false)
+      setNewProduct(emptyProduct)
+    }
   }
 
   const handleUpdate = async () => {
     if (!editingProduct) return
-    setProducts(products.map(p =>
-      p.id === editingProduct.id ? editingProduct : p
-    ))
-    setEditingProduct(null)
+    const { id, flavor_notes, ...updates } = editingProduct
+
+    const productData = {
+      ...updates,
+      flavor_notes: typeof flavor_notes === 'string' && flavor_notes.trim() !== ''
+        ? `{${flavor_notes}}`
+        : '{}'
+    }
+
+    const { data, error } = await nhost.graphql.request(`
+      mutation UpdateProduct($id: uuid!, $set: products_set_input!) {
+        update_products_by_pk(pk_columns: { id: $id }, _set: $set) {
+             id name description short_description price weight sku image_url color_class origin roast_level flavor_notes is_active is_highlighted category stock_quantity
+        }
+      }
+    `, { id, set: productData })
+
+    if (!error && data?.update_products_by_pk) {
+      setProducts(products.map(p =>
+        p.id === id ? data.update_products_by_pk : p
+      ))
+      setEditingProduct(null)
+    }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return
-    setProducts(products.filter(p => p.id !== id))
+    const { error } = await nhost.graphql.request(`
+      mutation DeleteProduct($id: uuid!) {
+        delete_products_by_pk(id: $id) {
+          id
+        }
+      }
+    `, { id })
+
+    if (!error) {
+      setProducts(products.filter(p => p.id !== id))
+    }
   }
 
   const toggleActive = async (product: Product) => {
-    setProducts(products.map(p =>
-      p.id === product.id ? { ...p, is_active: !p.is_active } : p
-    ))
+    const { data, error } = await nhost.graphql.request(`
+      mutation ToggleActive($id: uuid!, $isActive: Boolean!) {
+        update_products_by_pk(pk_columns: { id: $id }, _set: { is_active: $isActive }) {
+          id
+        }
+      }
+    `, { id: product.id, isActive: !product.is_active })
+
+    if (!error && data?.update_products_by_pk) {
+      setProducts(products.map(p =>
+        p.id === product.id ? { ...p, is_active: !product.is_active } : p
+      ))
+    }
+  }
+
+  if (isLoading) {
+    return <div className="text-white">Loading products...</div>
   }
 
   return (
@@ -146,7 +222,7 @@ export function ProductsManager({ products: initialProducts }: ProductsManagerPr
             <div className="p-6">
               <ProductForm
                 product={editingProduct}
-                onChange={setEditingProduct}
+                onChange={(p) => setEditingProduct(p as Product)}
               />
               <div className="flex gap-3 mt-6">
                 <button
@@ -269,7 +345,7 @@ export function ProductsManager({ products: initialProducts }: ProductsManagerPr
 
 interface ProductFormProps {
   product: Omit<Product, "id"> | Product
-  onChange: (product: any) => void
+  onChange: (product: Omit<Product, "id"> | Product) => void
 }
 
 function ProductForm({ product, onChange }: ProductFormProps) {

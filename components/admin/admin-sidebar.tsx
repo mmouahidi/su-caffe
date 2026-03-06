@@ -3,10 +3,12 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
+import { nhost } from "@/lib/nhost"
+import { useLocalData } from "@/lib/app-config"
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
   LogOut,
   Users
 } from "lucide-react"
@@ -20,7 +22,10 @@ export function AdminSidebar({ role, userEmail }: AdminSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    if (!useLocalData) {
+      await nhost.auth.signOut()
+    }
     router.push("/admin/login")
   }
 
@@ -57,17 +62,16 @@ export function AdminSidebar({ role, userEmail }: AdminSidebarProps) {
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || 
+            const isActive = pathname === item.href ||
               (item.href !== "/admin" && pathname.startsWith(item.href))
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded transition-colors font-sans text-sm ${
-                    isActive 
-                      ? "bg-gold/10 text-gold border-l-2 border-gold" 
+                  className={`flex items-center gap-3 px-4 py-3 rounded transition-colors font-sans text-sm ${isActive
+                      ? "bg-gold/10 text-gold border-l-2 border-gold"
                       : "text-neutral-400 hover:text-white hover:bg-neutral-800/50"
-                  }`}
+                    }`}
                 >
                   <item.icon className="w-5 h-5" />
                   {item.label}

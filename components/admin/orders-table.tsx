@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Eye, ChevronDown, ChevronUp, MessageCircle } from "lucide-react"
+import { useState, useEffect } from "react"
+import { ChevronDown, ChevronUp, MessageCircle } from "lucide-react"
+import { nhost } from "@/lib/nhost"
 
 interface OrderItem {
   id: string
@@ -41,14 +41,45 @@ const statusColors: Record<string, string> = {
 }
 
 export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
-  const [orders, setOrders] = useState(initialOrders)
+  const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>("all")
-  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      const { data, error } = await nhost.graphql.request(`
+        query {
+          orders(order_by: { created_at: desc }) {
+            id customer_name customer_phone customer_address customer_city total_amount status notes created_at
+            order_items {
+              id quantity unit_price
+              product { name sku }
+            }
+          }
+        }
+      `)
+
+      if (!error && data?.orders) {
+        setOrders(data.orders)
+      }
+      setIsLoading(false)
+    }
+    loadOrders()
+  }, [])
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
-    // Local dev: just update state
-    setOrders(orders.map(order => 
+    const { error } = await nhost.graphql.request(`
+      mutation UpdateOrderStatus($id: uuid!, $status: String!) {
+        update_orders_by_pk(pk_columns: { id: $id }, _set: { status: $status }) {
+          id
+        }
+      }
+    `, { id: orderId, status: newStatus })
+
+    if (error) return
+
+    setOrders(orders.map(order =>
       order.id === orderId ? { ...order, status: newStatus } : order
     ))
   }
@@ -58,7 +89,7 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
       `Hello ${order.customer_name}!\n\n` +
       `Your order #${order.id.slice(0, 8)} has been ${order.status}.\n\n` +
       `Order Details:\n` +
-      order.order_items.map(item => 
+      order.order_items.map(item =>
         `- ${item.product.name} x${item.quantity}`
       ).join("\n") +
       `\n\nTotal: ${Number(order.total_amount).toFixed(2)} MAD\n\n` +
@@ -67,8 +98,8 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
     window.open(`https://wa.me/${order.customer_phone.replace(/\D/g, "")}?text=${message}`, "_blank")
   }
 
-  const filteredOrders = filter === "all" 
-    ? orders 
+  const filteredOrders = filter === "all"
+    ? orders
     : orders.filter(order => order.status === filter)
 
   return (
@@ -79,11 +110,10 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
           <button
             key={status}
             onClick={() => setFilter(status)}
-            className={`px-4 py-2 text-sm font-sans rounded transition-colors ${
-              filter === status
-                ? "bg-gold text-off-black"
-                : "bg-neutral-800 text-neutral-400 hover:text-white"
-            }`}
+            className={`px-4 py-2 text-sm font-sans rounded transition-colors ${filter === status
+              ? "bg-gold text-off-black"
+              : "bg-neutral-800 text-neutral-400 hover:text-white"
+              }`}
           >
             {status.charAt(0).toUpperCase() + status.slice(1)}
             {status !== "all" && (
@@ -127,8 +157,8 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
             {filteredOrders.length > 0 ? (
               filteredOrders.map((order) => (
                 <>
-                  <tr 
-                    key={order.id} 
+                  <tr
+                    key={order.id}
                     className="border-b border-neutral-800/50 hover:bg-neutral-800/30 cursor-pointer"
                     onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
                   >
@@ -180,7 +210,7 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
                       </button>
                     </td>
                   </tr>
-                  
+
                   {/* Expanded Order Details */}
                   {expandedOrder === order.id && (
                     <tr className="bg-neutral-800/30">
@@ -202,7 +232,7 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
                               ))}
                             </div>
                           </div>
-                          
+
                           {/* Shipping Info */}
                           <div>
                             <h4 className="text-gold text-sm font-sans mb-3">Shipping Address</h4>

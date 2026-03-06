@@ -1,8 +1,58 @@
-import { getDashboardStats } from "@/lib/local-data"
+"use client"
+
+import { useEffect, useState } from "react"
+import { nhost } from "@/lib/nhost"
 import { Package, ShoppingCart, DollarSign, Clock } from "lucide-react"
 
-export default async function AdminDashboardPage() {
-  const { totalOrders, pendingOrders, totalRevenue, activeProducts, recentOrders } = getDashboardStats()
+type RecentOrder = {
+  id: string
+  customer_name: string
+  customer_phone: string
+  total_amount: number
+  status: string
+  created_at: string
+}
+
+export default function AdminDashboardPage() {
+  const [statsData, setStatsData] = useState({
+    totalOrders: 0,
+    pendingOrders: 0,
+    totalRevenue: 0,
+    activeProducts: 0,
+    recentOrders: [] as RecentOrder[]
+  })
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data, error } = await nhost.graphql.request(`
+        query {
+          orders_aggregate { aggregate { count } }
+          pending_orders: orders_aggregate(where: {status: {_eq: "pending"}}) { aggregate { count } }
+          revenue_orders: orders(where: {status: {_in: ["confirmed", "delivered"]}}) { total_amount }
+          products_aggregate(where: {is_active: {_eq: true}}) { aggregate { count } }
+          recent_orders: orders(order_by: {created_at: desc}, limit: 5) {
+            id customer_name customer_phone total_amount status created_at
+          }
+        }
+      `)
+
+      if (!error && data) {
+        const totalRevenue = data.revenue_orders.reduce((sum: number, o: any) => sum + Number(o.total_amount), 0)
+        setStatsData({
+          totalOrders: data.orders_aggregate.aggregate.count,
+          pendingOrders: data.pending_orders.aggregate.count,
+          totalRevenue,
+          activeProducts: data.products_aggregate.aggregate.count,
+          recentOrders: data.recent_orders
+        })
+      }
+      setIsLoading(false)
+    }
+    fetchData()
+  }, [])
+
+  const { totalOrders, pendingOrders, totalRevenue, activeProducts, recentOrders } = statsData
 
   const stats = [
     {
@@ -42,6 +92,8 @@ export default async function AdminDashboardPage() {
     cancelled: "bg-red-500/20 text-red-400",
   }
 
+  if (isLoading) return <div className="text-white">Loading dashboard...</div>
+
   return (
     <div>
       <h1 className="font-serif text-3xl text-white mb-8">Dashboard</h1>
@@ -51,7 +103,7 @@ export default async function AdminDashboardPage() {
         {stats.map((stat) => (
           <div
             key={stat.label}
-            className="bg-neutral-900/50 border border-neutral-800 p-6 rounded"
+            className="flex flex-col bg-neutral-900/50 border border-neutral-800 p-6 rounded"
           >
             <div className="flex items-center justify-between mb-4">
               <span className="text-neutral-400 text-sm font-sans">{stat.label}</span>

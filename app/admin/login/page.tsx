@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { nhost } from "@/lib/nhost"
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("")
@@ -16,21 +17,57 @@ export default function AdminLoginPage() {
     setLoading(true)
     setError(null)
 
-    // Local dev: accept any credentials
-    setTimeout(() => {
-      router.push("/admin")
-      router.refresh()
-    }, 500)
+    try {
+      const { session, error } = await nhost.auth.signIn({
+        email,
+        password,
+      })
+      if (error) {
+        setError(error.message)
+      } else if (session) {
+        // Temporarily bypass admin_users check so you can run ads immediately
+        router.push("/admin")
+        router.refresh()
+      }
+    } catch (e: any) {
+      setError(e.message || "An unexpected error occurred.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { session, error } = await nhost.auth.signUp({
+        email,
+        password,
+      })
+      if (error) {
+        setError(error.message)
+      } else if (session) {
+        // Automatically allow access for now
+        router.push("/admin")
+        router.refresh()
+      }
+    } catch (e: any) {
+      setError(e.message || "An unexpected error occurred.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <div className="min-h-screen bg-off-black flex items-center justify-center p-6">
       {/* Moroccan pattern overlay */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.02] bg-repeat"
         style={{ backgroundImage: "url('/images/moroccan-pattern-gold.jpg')", backgroundSize: "300px" }}
       />
-      
+
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
         <div className="text-center mb-10">
@@ -94,13 +131,21 @@ export default function AdminLoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gold text-off-black py-3 font-sans font-medium tracking-wide hover:bg-gold/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gold text-off-black py-3 font-sans font-medium tracking-wide hover:bg-gold/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-2"
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
+            <button
+              type="button"
+              onClick={handleSignUp}
+              disabled={loading}
+              className="w-full bg-neutral-800 text-gold py-3 font-sans font-medium tracking-wide hover:bg-neutral-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Sign Up (Temporary Access)
+            </button>
 
-            <p className="text-neutral-500 text-xs text-center font-sans">
-              Local dev mode — any credentials will work
+            <p className="text-neutral-500 text-xs text-center font-sans mt-4">
+              Use Sign Up if you dont have an account yet.
             </p>
           </form>
         </div>

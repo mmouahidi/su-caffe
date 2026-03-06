@@ -1,11 +1,10 @@
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 
-export default async function AdminDashboardLayout({
+export default function AdminDashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Local dev: skip auth, use mock admin
   return (
     <div className="min-h-screen bg-neutral-950 flex">
       <AdminSidebar role="admin" userEmail="admin@sucaffe.com" />
@@ -15,3 +14,4 @@ export default async function AdminDashboardLayout({
     </div>
   )
 }
+

@@ -444,6 +444,6 @@ export const translations = {
       en: "English",
     },
   },
-} as const
+}
 
 export type Translations = typeof translations.fr
